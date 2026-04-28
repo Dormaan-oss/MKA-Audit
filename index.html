@@ -219,6 +219,12 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
       <div id="home-count-sub" style="font-size:13px;color:var(--muted);margin-top:3px">Fragen</div>
     </div>
     <div>
+      <div class="label">Prüfer</div>
+      <select id="auditor-select">
+        <option value="">– Prüfer auswählen –</option>
+      </select>
+    </div>
+    <div>
       <div class="label">Arbeitsplatz</div>
       <select id="workplace-select">
         <option value="">– Kein Arbeitsplatz –</option>
@@ -244,10 +250,16 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
   </div>
   <div class="body">
 
-    <!-- Prüfername -->
+    <!-- Prüfer -->
     <div>
-      <div class="settings-section-title">👤 Mein Name (Prüfer)</div>
-      <input type="text" id="auditor-name-input" placeholder="Vor- und Nachname..." oninput="saveAuditorName()">
+      <div class="settings-section-title">👤 Prüfer</div>
+      <div class="card-flat" id="auditor-list"></div>
+      <div style="margin-top:12px">
+        <div class="new-q-row">
+          <input type="text" id="new-auditor-input" placeholder="Name des Prüfers eingeben..." onkeydown="if(event.key==='Enter') addAuditor()">
+          <button class="btn btn-primary" onclick="addAuditor()">+ Hinzufügen</button>
+        </div>
+      </div>
     </div>
 
     <!-- Rollenbezeichnungen -->
@@ -419,7 +431,7 @@ const STATUS_TEXT  = {null:'–', green:'IO', yellow:'Auffällig', red:'Mangelha
 /* ============================================================
    DATA MODEL
    orgUnits:   [{id, name, icon}]
-   ouSettings: {[ouId]: {auditorName, roleNames:{role1,role2}, workplaces:[], questions:{role1:[],role2:[]}}}
+   ouSettings: {[ouId]: {auditors:[], roleNames:{role1,role2}, workplaces:[], questions:{role1:[],role2:[]}}}
 ============================================================ */
 function loadOUs()        { try{const s=localStorage.getItem('v3_ous');    if(s) return JSON.parse(s);} catch(e){} return []; }
 function saveOUs()        { try{localStorage.setItem('v3_ous', JSON.stringify(orgUnits));} catch(e){} }
@@ -428,7 +440,7 @@ function saveOUSettings() { try{localStorage.setItem('v3_ou_settings', JSON.stri
 
 function getOUS(ouId) {
   if(!ouSettings[ouId]) ouSettings[ouId] = {
-    auditorName: '',
+    auditors:    [],
     roleNames:   {role1:'Mitarbeiter', role2:'Schichtführer'},
     workplaces:  [],
     questions:   {role1:[], role2:[]}
@@ -437,6 +449,12 @@ function getOUS(ouId) {
   if(!s.roleNames)  s.roleNames  = {role1:'Mitarbeiter', role2:'Schichtführer'};
   if(!s.workplaces) s.workplaces = [];
   if(!s.questions)  s.questions  = {role1:[], role2:[]};
+  // Migration: auditorName (string) → auditors (array)
+  if(!s.auditors) {
+    s.auditors = (s.auditorName && s.auditorName.trim()) ? [s.auditorName.trim()] : [];
+    delete s.auditorName;
+    saveOUSettings();
+  }
   return s;
 }
 
@@ -453,6 +471,7 @@ let answers     = [];
 let currentQ    = 0;
 let editingIdx  = -1;
 let editingWpIdx= -1;
+let editingAuditorIdx = -1;
 let editingOUId = null;   // for the edit-icon modal
 let selectedAddIcon = ICONS[0];
 let selectedEditIcon = ICONS[0];
@@ -595,6 +614,11 @@ function renderHome() {
   const cur = sel.value;
   sel.innerHTML = '<option value="">– Kein Arbeitsplatz –</option>' +
     (s.workplaces||[]).map(wp=>`<option value="${esc(wp)}"${cur===wp?' selected':''}>${esc(wp)}</option>`).join('');
+  // auditors
+  const asel = document.getElementById('auditor-select');
+  const acur = asel.value;
+  asel.innerHTML = '<option value="">– Prüfer auswählen –</option>' +
+    (s.auditors||[]).map(a=>`<option value="${esc(a)}"${acur===a?' selected':''}>${esc(a)}</option>`).join('');
 }
 
 function selectRole(role) { currentRole=role; renderHome(); }
@@ -606,21 +630,56 @@ function renderSettings() {
   if(!currentOU) { goTo('orgunit'); return; }
   const s = getOUS(currentOU.id);
   document.getElementById('settings-ou-title').textContent = currentOU.icon+' '+currentOU.name;
-  document.getElementById('auditor-name-input').value  = s.auditorName||'';
   document.getElementById('role1-name-input').value    = s.roleNames.role1;
   document.getElementById('role2-name-input').value    = s.roleNames.role2;
   document.getElementById('set-r1-name').textContent   = s.roleNames.role1;
   document.getElementById('set-r2-name').textContent   = s.roleNames.role2;
   document.getElementById('set-btn-r1').className = 'role-btn'+(editRole==='role1'?' active':'');
   document.getElementById('set-btn-r2').className = 'role-btn'+(editRole==='role2'?' active':'');
+  renderAuditorsList();
   renderQuestionsList();
   renderWorkplacesList();
 }
 
-function saveAuditorName() {
+/* Auditors */
+function renderAuditorsList() {
   if(!currentOU) return;
-  getOUS(currentOU.id).auditorName = document.getElementById('auditor-name-input').value;
-  saveOUSettings();
+  const auditors = getOUS(currentOU.id).auditors||[];
+  const list = document.getElementById('auditor-list');
+  if(auditors.length===0) { list.innerHTML='<div class="empty-hint">Keine Prüfer vorhanden.</div>'; return; }
+  list.innerHTML = auditors.map((a,i) => {
+    if(editingAuditorIdx===i) return `<div class="q-item"><div class="q-edit-row">
+      <input type="text" id="edit-auditor-${i}" value="${esc(a)}" onkeydown="if(event.key==='Enter') saveAuditor(${i})">
+      <div class="edit-actions">
+        <button class="btn-sm-save" onclick="saveAuditor(${i})">✓ Speichern</button>
+        <button class="btn-ghost" onclick="cancelAuditor()">Abbrechen</button>
+      </div></div></div>`;
+    return `<div class="q-item">
+      <span class="q-num">${i+1}.</span>
+      <span class="q-text">${esc(a)}</span>
+      <div class="q-actions">
+        <button class="btn-ghost" onclick="editAuditor(${i})" style="font-size:17px;padding:4px 8px">✏</button>
+        <button class="btn-sm-danger" onclick="delAuditor(${i})">✕</button>
+      </div></div>`;
+  }).join('');
+  if(editingAuditorIdx>=0) setTimeout(()=>{const el=document.getElementById('edit-auditor-'+editingAuditorIdx);if(el){el.focus();el.select();}},50);
+}
+function editAuditor(i)   { editingAuditorIdx=i; renderAuditorsList(); }
+function cancelAuditor()  { editingAuditorIdx=-1; renderAuditorsList(); }
+function saveAuditor(i)   {
+  const v=document.getElementById('edit-auditor-'+i).value.trim(); if(!v) return;
+  getOUS(currentOU.id).auditors[i]=v; editingAuditorIdx=-1; saveOUSettings(); renderAuditorsList();
+}
+function delAuditor(i) {
+  getOUS(currentOU.id).auditors.splice(i,1);
+  if(editingAuditorIdx===i) editingAuditorIdx=-1; saveOUSettings(); renderAuditorsList();
+}
+function addAuditor() {
+  const inp=document.getElementById('new-auditor-input');
+  const v=inp.value.trim(); if(!v) return;
+  if(!getOUS(currentOU.id).auditors) getOUS(currentOU.id).auditors=[];
+  getOUS(currentOU.id).auditors.push(v);
+  inp.value=''; saveOUSettings(); renderAuditorsList();
 }
 
 function saveRoleNames() {
@@ -804,7 +863,7 @@ function renderTable() {
   });
   let tsv=lines.join('\n');
   if(longC.length>0) tsv+='\nBemerkungen:  '+longC.map(c=>`(${c.nr}) ${c.text}`).join('  ');
-  const auditor  = (s.auditorName||'').trim();
+  const auditor  = (document.getElementById('auditor-select').value||'').trim();
   const auditee  = (document.getElementById('auditee-name-input').value||'').trim();
   const workplace= (document.getElementById('workplace-select').value||'').trim();
   if(auditor)   tsv+='\n'+auditor;
