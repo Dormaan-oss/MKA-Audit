@@ -143,7 +143,10 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
 .ou-tool-btn.del:hover{background:var(--red-status-bg);color:var(--red-status);}
 
 /* ADD OU FORM */
-.add-ou-form{background:var(--card);border:2px dashed var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.add-ou-form{background:var(--card);border:2px dashed var(--border);border-radius:14px;padding:16px;display:none;flex-direction:column;gap:12px;}
+.add-ou-form.open{display:flex;}
+.add-ou-toggle{width:100%;padding:14px;border-radius:10px;background:var(--card);border:2px dashed var(--border);color:var(--navy);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s;}
+.add-ou-toggle:hover{background:#eef1f7;}
 .icon-picker{display:flex;flex-wrap:wrap;gap:6px;}
 .icon-option{font-size:24px;padding:8px 10px;border-radius:8px;border:2px solid var(--border);background:var(--card);cursor:pointer;line-height:1;transition:all .15s;}
 .icon-option.selected{border-color:var(--navy);background:#eef1f7;}
@@ -179,7 +182,10 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
     </div>
 
     <!-- ADD NEW OU FORM -->
-    <div class="add-ou-form">
+    <button class="add-ou-toggle" id="add-ou-toggle" onclick="toggleAddOU()">
+      <span id="add-ou-toggle-icon">➕</span> <span id="add-ou-toggle-label">Neue Organisationseinheit anlegen</span>
+    </button>
+    <div class="add-ou-form" id="add-ou-form">
       <div class="settings-section-title">➕ Neue Organisationseinheit</div>
       <input type="text" id="new-ou-name" placeholder="Name (z. B. Fertigung, Montage ...)">
       <div>
@@ -414,9 +420,14 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
    ICONS & CONSTANTS
 ============================================================ */
 const ICONS = [
-  '🏭','🔧','🔩','⚙️','🏗️','🛠️','🔬','🖥️','📦','🚛',
-  '🏢','🔌','💡','🧪','🖨️','🔑','🪛','🪚','⛽','🏋️',
-  '🚜','🛻','🔋','📡','🧲','🪝','🗜️','⚡','🌡️','🏆'
+  '🏭','⛓️','🎛️','🕹️','🔄','🧰','⚙️','🔧','🔩','🏗️',
+  '🛠️','🪛','🪝','📦','🚛','🔌','💡','🖥️','🖨️','🔬',
+  '🧪','🪜','🚜','🏎️','✈️','🚢','⚡','🔋','🪤','🗜️',
+  '📐','📏','🪚','🔑','🗝️','🛡️','🧲','🌡️','💧','🔥',
+];
+  '🛠️','🔬','🖥️','📦','🚛','🏢','🔌','💡','🧪','🖨️',
+  '🔑','🪛','🪚','⛽','🏋️','🚜','🛻','🔋','📡','🧲',
+  '🪝','🗜️','⚡','🌡️','🏆'
 ];
 
 const STATUS_CFG = {
@@ -509,7 +520,14 @@ function renderOUScreen() {
   // OU grid
   const grid = document.getElementById('ou-grid');
   if(orgUnits.length===0) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--muted);font-size:15px">Noch keine OE vorhanden.<br>Bitte unten eine anlegen.</div>`;
+    grid.innerHTML = '';
+    // Auto-open the add form when no OEs exist yet
+    const form = document.getElementById('add-ou-form');
+    if(!form.classList.contains('open')) {
+      form.classList.add('open');
+      document.getElementById('add-ou-toggle-icon').textContent  = '✖';
+      document.getElementById('add-ou-toggle-label').textContent = 'Abbrechen';
+    }
     return;
   }
   grid.innerHTML = orgUnits.map(ou => `
@@ -526,7 +544,17 @@ function renderOUScreen() {
   `).join('');
 }
 
-function selectAddIcon(icon) {
+function toggleAddOU() {
+  const form = document.getElementById('add-ou-form');
+  const icon = document.getElementById('add-ou-toggle-icon');
+  const label = document.getElementById('add-ou-toggle-label');
+  const isOpen = form.classList.toggle('open');
+  icon.textContent  = isOpen ? '✖' : '➕';
+  label.textContent = isOpen ? 'Abbrechen' : 'Neue Organisationseinheit anlegen';
+  if(isOpen) renderOUScreen(); // rebuild icon picker when opening
+}
+
+
   selectedAddIcon = icon;
   document.querySelectorAll('#icon-picker .icon-option').forEach(b => {
     b.classList.toggle('selected', b.textContent===icon);
@@ -540,6 +568,11 @@ function addOrgUnit() {
   orgUnits.push({id:genId(), name, icon:selectedAddIcon});
   inp.value = '';
   saveOUs();
+  // Close the form after adding
+  const form = document.getElementById('add-ou-form');
+  form.classList.remove('open');
+  document.getElementById('add-ou-toggle-icon').textContent  = '➕';
+  document.getElementById('add-ou-toggle-label').textContent = 'Neue Organisationseinheit anlegen';
   renderOUScreen();
 }
 
