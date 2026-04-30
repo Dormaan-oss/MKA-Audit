@@ -555,6 +555,7 @@ function toggleAddOU() {
 }
 
 
+function selectAddIcon(icon) {
   selectedAddIcon = icon;
   document.querySelectorAll('#icon-picker .icon-option').forEach(b => {
     b.classList.toggle('selected', b.textContent===icon);
