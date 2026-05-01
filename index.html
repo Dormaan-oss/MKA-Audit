@@ -369,7 +369,7 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
     </div>
     <button class="btn btn-primary" style="font-size:15px;padding:17px" onclick="exportPDF()">📄 PDF-Report exportieren</button>
     <button class="btn btn-primary" style="font-size:15px;padding:17px" onclick="goTo('table')">📊 Tabelle für Excel anzeigen</button>
-    <button class="btn btn-secondary" onclick="goTo('home')">↩ Neues Audit starten</button>
+    <button class="btn btn-secondary" onclick="goTo('home', true)">↩ Neues Audit starten</button>
   </div>
 </div>
 
@@ -394,7 +394,7 @@ select{width:100%;background:var(--card);border:1.5px solid var(--border);border
       <textarea id="tsv-output" readonly></textarea>
     </div>
     <button class="select-all-btn" onclick="selectAll()">☑ Alles markieren</button>
-    <button class="btn btn-secondary" onclick="goTo('home')">↩ Neues Audit starten</button>
+    <button class="btn btn-secondary" onclick="goTo('home', true)">↩ Neues Audit starten</button>
   </div>
 </div>
 
@@ -493,12 +493,19 @@ function genId(){ return 'ou_'+Date.now()+'_'+Math.random().toString(36).slice(2
 /* ============================================================
    NAVIGATION
 ============================================================ */
-function goTo(screen) {
+function goTo(screen, clearHome) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen).classList.add('active');
   window.scrollTo(0,0);
   if(screen==='orgunit')  renderOUScreen();
-  if(screen==='home')     renderHome();
+  if(screen==='home') {
+    if(clearHome) {
+      document.getElementById('auditor-select').value    = '';
+      document.getElementById('workplace-select').value  = '';
+      document.getElementById('auditee-name-input').value= '';
+    }
+    renderHome();
+  }
   if(screen==='settings') renderSettings();
   if(screen==='result')   renderResult();
   if(screen==='table')    renderTable();
